@@ -1,10 +1,9 @@
 <resources>
-    <!-- 应用显示名称 -->
-    <string name="app_name">董卓</string>
-    
-    <!-- 通知渠道ID（需唯一，建议用包名+标识） -->
-    <string name="channel_id">com.stand.sounder_template.audio_channel</string>
-    
-    <!-- 通知栏显示的标题 -->
+    <string name="app_name">童卓</string>
+    <string name="channel_id">童卓</string>
     <string name="notice_title">为父待你不薄</string>
+    <!-- 新增中断模式相关字符串 -->
+    <string name="interrupt_mode_on">中断式播放: 开启</string>
+    <string name="interrupt_mode_off">中断式播放: 关闭</string>
+    <string name="toggle_interrupt_hint">点击切换中断播放模式</string>
 </resources>
