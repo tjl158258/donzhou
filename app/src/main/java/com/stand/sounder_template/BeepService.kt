@@ -13,8 +13,7 @@ import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import java.util.Collections // 导入Collections
-
+import java.util.Collections
 
 class BeepService : Service() {
     private val binder = LocalBinder()
@@ -29,14 +28,11 @@ class BeepService : Service() {
         }
     }
 
-
     inner class LocalBinder : Binder() {
         fun getService(): BeepService = this@BeepService
     }
 
-
     override fun onBind(intent: Intent): IBinder = binder
-
 
     @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -47,13 +43,10 @@ class BeepService : Service() {
                 return START_NOT_STICKY
             }
         }
-
         playParallelBeep()
-        // 适配前台服务类型（这里直接去掉ServiceInfo，避免低版本不兼容）
         startForeground(notificationId, createNotification())
         return START_NOT_STICKY
     }
-
 
     override fun onCreate() {
         super.onCreate()
@@ -63,13 +56,11 @@ class BeepService : Service() {
         )
     }
 
-
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(notificationDeleteReceiver)
         stopAllAudio()
     }
-
 
     private fun stopAllAudio() {
         for (player in livePlayers) {
@@ -79,12 +70,17 @@ class BeepService : Service() {
         livePlayers.clear()
     }
 
-
+    // ========== 核心修改：添加中断式播放逻辑 ==========
     fun playParallelBeep() {
         val afd = BeepManager.randomAssetFd(this)
         val mp = MediaPlayer()
-        livePlayers += mp
 
+        // 开关开启时，停止所有当前音频
+        if (SwitchManager.isInterruptPlayEnabled) {
+            stopAllAudio()
+        }
+
+        livePlayers += mp
         try {
             mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             mp.setOnPreparedListener {
@@ -109,7 +105,7 @@ class BeepService : Service() {
         }
     }
 
-
+    // ========== 新增：通知栏点击跳转开关界面 ==========
     private fun createNotification(): Notification {
         val channelId = getString(R.string.channel_id)
         val channelName = getString(R.string.app_name)
@@ -124,6 +120,16 @@ class BeepService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
 
+        // 通知点击跳转开关界面
+        val switchIntent = Intent(this, SwitchControlActivity::class.java)
+        val contentPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            switchIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        )
+
+        // 通知删除广播
         val deleteIntent = Intent("com.stand.sounder_template.NOTIFICATION_DELETED")
         val deletePendingIntent = PendingIntent.getBroadcast(
             this,
@@ -135,7 +141,8 @@ class BeepService : Service() {
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle(text)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setDeleteIntent(deletePendingIntent)
+            .setContentIntent(contentPendingIntent) // 点击打开开关界面
+            .setDeleteIntent(deletePendingIntent)    // 删除通知停止播放
             .build()
     }
 }
