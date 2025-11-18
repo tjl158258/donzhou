@@ -7,7 +7,7 @@ object BeepManager {
     private var audioNames: List<String>? = null
     // 核心控制变量
     private var nextTargetIndex = 0 // 下一个要提升概率的音频索引
-    private var currentBoostProbability = 60 // 目标音频提升概率（初始60%）
+    private var currentBoostProbability = 90 // 目标音频提升概率（初始60%）
     private var isProbBoosted = false // 标记是否进入“概率提升序列”
 
     /**
@@ -15,7 +15,7 @@ object BeepManager {
      */
     private fun resetProbState() {
         nextTargetIndex = 0
-        currentBoostProbability = 60
+        currentBoostProbability = 90
         isProbBoosted = false
     }
 
