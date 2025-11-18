@@ -13,12 +13,14 @@ import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import java.util.Collections // 新增：导入Collections
+
 
 class BeepService : Service() {
     private val binder = LocalBinder()
     private val notificationId: Int = 1
+    // 修正：初始化livePlayers的语法
     private val livePlayers = Collections.synchronizedSet(mutableSetOf<MediaPlayer>())
-    // 通知删除的广播接收器
     private val notificationDeleteReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             stopAllAudio()
@@ -39,10 +41,8 @@ class BeepService : Service() {
 
     @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // 安卓13及以上，先检查通知权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (NotificationManagerCompat.from(this).areNotificationsEnabled().not()) {
-                // 没有通知权限，提示用户开启（可选逻辑）
+            if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
                 Toast.makeText(this, "需要通知权限以持续播放音频", Toast.LENGTH_LONG).show()
                 stopSelf()
                 return START_NOT_STICKY
@@ -50,9 +50,13 @@ class BeepService : Service() {
         }
 
         playParallelBeep()
-        // 安卓12及以上，前台服务需要指定类型
+        // 修正：导入ServiceInfo，并适配低版本
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            startForeground(notificationId, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            startForeground(
+                notificationId,
+                createNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK // 新增：导入ServiceInfo
+            )
         } else {
             startForeground(notificationId, createNotification())
         }
@@ -76,11 +80,11 @@ class BeepService : Service() {
     }
 
 
-    // 停止所有音频并释放资源
     private fun stopAllAudio() {
-        livePlayers.forEach {
-            if (it.isPlaying) it.stop()
-            it.release()
+        // 修正：遍历livePlayers的语法
+        for (player in livePlayers) {
+            if (player.isPlaying) player.stop()
+            player.release()
         }
         livePlayers.clear()
     }
@@ -121,7 +125,6 @@ class BeepService : Service() {
         val channelName = getString(R.string.app_name)
         val text = getString(R.string.notice_title)
 
-        // 安卓O及以上创建通知渠道
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
@@ -131,7 +134,6 @@ class BeepService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
 
-        // 通知被删除的PendingIntent
         val deleteIntent = Intent("com.stand.sounder_template.NOTIFICATION_DELETED")
         val deletePendingIntent = PendingIntent.getBroadcast(
             this,
