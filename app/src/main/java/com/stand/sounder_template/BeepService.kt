@@ -13,13 +13,12 @@ import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import java.util.Collections // 新增：导入Collections
+import java.util.Collections // 导入Collections
 
 
 class BeepService : Service() {
     private val binder = LocalBinder()
     private val notificationId: Int = 1
-    // 修正：初始化livePlayers的语法
     private val livePlayers = Collections.synchronizedSet(mutableSetOf<MediaPlayer>())
     private val notificationDeleteReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -50,16 +49,8 @@ class BeepService : Service() {
         }
 
         playParallelBeep()
-        // 修正：导入ServiceInfo，并适配低版本
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            startForeground(
-                notificationId,
-                createNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK // 新增：导入ServiceInfo
-            )
-        } else {
-            startForeground(notificationId, createNotification())
-        }
+        // 适配前台服务类型（这里直接去掉ServiceInfo，避免低版本不兼容）
+        startForeground(notificationId, createNotification())
         return START_NOT_STICKY
     }
 
@@ -81,7 +72,6 @@ class BeepService : Service() {
 
 
     private fun stopAllAudio() {
-        // 修正：遍历livePlayers的语法
         for (player in livePlayers) {
             if (player.isPlaying) player.stop()
             player.release()
