@@ -1,5 +1,10 @@
 <resources>
+    <!-- 应用显示名称 -->
     <string name="app_name">董卓</string>
-    <string name="channel_id">董卓</string>
+    
+    <!-- 通知渠道ID（需唯一，建议用包名+标识） -->
+    <string name="channel_id">com.stand.sounder_template.audio_channel</string>
+    
+    <!-- 通知栏显示的标题 -->
     <string name="notice_title">为父待你不薄</string>
 </resources>
