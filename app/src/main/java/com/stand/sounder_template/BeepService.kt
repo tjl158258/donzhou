@@ -1,10 +1,7 @@
 package com.stand.sounder_template
 
 import android.annotation.SuppressLint
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.Service
+import android.app.*
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -15,23 +12,16 @@ import android.os.Build
 import android.os.IBinder
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import java.util.Collections
+import androidx.core.app.NotificationManagerCompat
 
 class BeepService : Service() {
     private val binder = LocalBinder()
     private val notificationId: Int = 1
-    // 管理正在播放的MediaPlayer（线程安全）
     private val livePlayers = Collections.synchronizedSet(mutableSetOf<MediaPlayer>())
     // 通知删除的广播接收器
     private val notificationDeleteReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            // 停止所有音频并释放资源
-            livePlayers.forEach {
-                if (it.isPlaying) it.stop()
-                it.release()
-            }
-            livePlayers.clear()
-            // 停止前台服务并销毁自身
+            stopAllAudio()
             stopForeground(true)
             stopSelf()
             Toast.makeText(this@BeepService, "音频已停止", Toast.LENGTH_SHORT).show()
@@ -49,15 +39,29 @@ class BeepService : Service() {
 
     @SuppressLint("ForegroundServiceType")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 安卓13及以上，先检查通知权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (NotificationManagerCompat.from(this).areNotificationsEnabled().not()) {
+                // 没有通知权限，提示用户开启（可选逻辑）
+                Toast.makeText(this, "需要通知权限以持续播放音频", Toast.LENGTH_LONG).show()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+
         playParallelBeep()
-        startForeground(notificationId, createNotification())
+        // 安卓12及以上，前台服务需要指定类型
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            startForeground(notificationId, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        } else {
+            startForeground(notificationId, createNotification())
+        }
         return START_NOT_STICKY
     }
 
 
     override fun onCreate() {
         super.onCreate()
-        // 注册通知删除的广播接收器
         registerReceiver(
             notificationDeleteReceiver,
             IntentFilter("com.stand.sounder_template.NOTIFICATION_DELETED")
@@ -67,10 +71,17 @@ class BeepService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // 注销广播接收器，避免内存泄漏
         unregisterReceiver(notificationDeleteReceiver)
-        // 释放所有剩余资源
-        livePlayers.forEach { it.release() }
+        stopAllAudio()
+    }
+
+
+    // 停止所有音频并释放资源
+    private fun stopAllAudio() {
+        livePlayers.forEach {
+            if (it.isPlaying) it.stop()
+            it.release()
+        }
         livePlayers.clear()
     }
 
@@ -110,7 +121,7 @@ class BeepService : Service() {
         val channelName = getString(R.string.app_name)
         val text = getString(R.string.notice_title)
 
-        // Android O及以上创建通知渠道
+        // 安卓O及以上创建通知渠道
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
@@ -120,20 +131,19 @@ class BeepService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
 
-        // 构建“通知被删除”的PendingIntent
+        // 通知被删除的PendingIntent
         val deleteIntent = Intent("com.stand.sounder_template.NOTIFICATION_DELETED")
         val deletePendingIntent = PendingIntent.getBroadcast(
             this,
             0,
             deleteIntent,
-            PendingIntent.FLAG_IMMUTABLE
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
 
-        // 构建通知并绑定删除事件
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle(text)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setDeleteIntent(deletePendingIntent) // 关键：通知被删除时触发广播
+            .setDeleteIntent(deletePendingIntent)
             .build()
     }
 }
